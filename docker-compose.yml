@@ -53,7 +53,10 @@ services:
   redis:
     image: redis:7-alpine
     command: ["redis-server", "--appendonly", "yes"]
-    ports: ["6379:6379"]
+    # Host port 6380 avoids clashing with a local (Homebrew) redis on 6379. Inside the
+    # compose network services still reach it as redis:6379.
+    ports: ["6380:6379"]
+    volumes: ["redisdata:/data"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -169,6 +172,7 @@ services:
 volumes:
   pgdata:
   miniodata:
+  redisdata:
   # Persists the downloaded embedding model across container recreates so it is
   # fetched from Hugging Face only once (not on every `up --force-recreate`).
   hfcache:
