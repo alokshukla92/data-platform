@@ -16,6 +16,10 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
+        # nginx:alpine's "nginx" user is uid/gid 101; set numerically so the
+        # kubelet can verify non-root (named users are rejected under runAsNonRoot).
+        runAsUser: 101
+        runAsGroup: 101
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: frontend
