@@ -1,0 +1,36 @@
+# Keep the build context small and the image clean. Without this, `COPY . /app`
+# would pull in the local virtualenv, git history and caches (slow + bloated).
+.git
+.gitignore
+.venv
+venv
+env
+
+# Python caches / build artifacts
+**/__pycache__
+**/*.py[cod]
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+htmlcov
+.coverage
+coverage.xml
+
+# Local runtime / secrets
+.env
+.env.*
+celerybeat-schedule
+celerybeat-schedule.*
+celerybeat.pid
+*.log
+
+# Editor / OS
+.DS_Store
+.idea
+.vscode
+
+# Docs / CI not needed at runtime
+docs
+.github
+terminals

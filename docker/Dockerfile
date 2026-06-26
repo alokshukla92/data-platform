@@ -12,14 +12,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential curl libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
-# ---- builder: install deps into a venv ----
+# ---- builder: install deps into a venv (cached independently of app source) ----
 FROM base AS builder
+# Enable pip's wheel cache in this stage (overrides the base image's NO_CACHE_DIR)
+# so the BuildKit cache mount below can persist downloaded wheels (e.g. torch).
+ENV PIP_NO_CACHE_DIR=0
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
+# Only the dependency manifest is copied here. A *stub* platform_core package lets
+# hatchling build metadata without the real source, so editing application code
+# does NOT invalidate this (expensive) dependency layer.
 COPY pyproject.toml README.md ./
-COPY libs ./libs
-# Install the platform_core package + all runtime deps.
-RUN pip install --upgrade pip && pip install .
+RUN mkdir -p libs/platform_core/platform_core \
+    && printf '"""build stub - real source is provided via PYTHONPATH at runtime"""\n' \
+       > libs/platform_core/platform_core/__init__.py
+# BuildKit cache mount keeps the pip wheel cache across builds, so a dependency
+# change re-downloads only what actually changed instead of all of PyTorch.
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && pip install .
 
 # ---- runtime: non-root, slim ----
 FROM base AS runtime

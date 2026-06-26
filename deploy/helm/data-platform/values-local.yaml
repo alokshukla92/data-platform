@@ -7,14 +7,20 @@ global:
 
 config:
   LOG_JSON: "false"
+  # No OTel collector in the kind cluster; empty endpoint disables the exporter
+  # (otherwise every service spams trace-export DNS failures).
+  OTEL_EXPORTER_OTLP_ENDPOINT: ""
 
 defaults:
   replicas: 1
   hpa: { enabled: false }
   pdb: { enabled: false }
+  # The retrieval service and Celery worker load PyTorch + the embedding model,
+  # which needs well over 512Mi (the old limit caused OOMKilled workers). Workers
+  # always use defaults.resources, so the headroom is set here.
   resources:
-    requests: { cpu: 50m, memory: 128Mi }
-    limits: { cpu: 500m, memory: 512Mi }
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: "2", memory: 1536Mi }
 
 workers:
   ingest: { queues: "ingest,embed", concurrency: 2, replicas: 1, hpa: { enabled: false }, keda: { enabled: false } }
