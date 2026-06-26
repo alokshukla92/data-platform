@@ -1,0 +1,25 @@
+# Local Jenkins controller for running the repo's Jenkinsfile.
+# Start:  docker compose -f jenkins/docker-compose.yml up -d --build
+# UI:     http://localhost:8088   (initial admin password: see jenkins/README.md)
+services:
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: data-platform-jenkins:local
+    container_name: data-platform-jenkins
+    # Local-only: run as root so the pipeline can use the mounted Docker socket
+    # without fighting host docker-group GIDs. Do NOT do this in a shared/prod Jenkins.
+    user: root
+    ports:
+      - "8088:8080"   # web UI
+      - "50000:50000" # inbound agents
+    environment:
+      JAVA_OPTS: "-Djenkins.install.runSetupWizard=true"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+volumes:
+  jenkins_home:

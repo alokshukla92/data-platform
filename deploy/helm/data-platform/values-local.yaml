@@ -26,6 +26,12 @@ workers:
   ingest: { queues: "ingest,embed", concurrency: 2, replicas: 1, hpa: { enabled: false }, keda: { enabled: false } }
   embed: { queues: "embed", concurrency: 1, replicas: 0, hpa: { enabled: false } }
 
+frontend:
+  enabled: true
+  replicas: 1
+  # Locally built image (kind load docker-image data-platform-frontend:dev).
+  image: { repository: data-platform-frontend, tag: dev }
+
 ingress:
   host: data-platform.local
 

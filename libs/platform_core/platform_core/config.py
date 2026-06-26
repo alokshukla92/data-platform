@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     jwt_access_ttl_minutes: int = 30
     api_key_salt: str = "change-me-too"
     rate_limit_default: str = "100/minute"
+    # Comma-separated list of allowed browser origins for the SPA frontend. "*"
+    # is fine for local/dev; lock this down to the real host(s) in production.
+    cors_origins: str = "*"
 
     # ---- AI / Embeddings ----
     embedding_provider: EmbeddingProvider = EmbeddingProvider.LOCAL
@@ -82,6 +85,11 @@ class Settings(BaseSettings):
     elastic_apm_service_name: str = "data-platform"
     elastic_apm_environment: str = "local"
     prometheus_enabled: bool = True
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     @computed_field  # type: ignore[prop-decorator]
     @property

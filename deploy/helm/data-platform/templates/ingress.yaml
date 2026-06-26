@@ -30,4 +30,14 @@ spec:
                 port: { number: 80 }
           {{- end }}
         {{- end }}
+        {{- if .Values.frontend.enabled }}
+          # Catch-all for the SPA. nginx-ingress matches the longer /api/* prefixes
+          # first, so the frontend only receives non-API paths.
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $root.Release.Name }}-frontend
+                port: { number: 80 }
+        {{- end }}
 {{- end }}

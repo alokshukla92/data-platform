@@ -95,6 +95,21 @@ workers:
 beat:
   enabled: true
 
+# React SPA served by nginx. Uses a separate image from the Python services.
+frontend:
+  enabled: true
+  replicas: 2
+  image:
+    repository: ghcr.io/alokshukla92/data-platform-frontend
+    tag: ""   # defaults to global.imageTag
+  # Empty -> SPA uses relative /api URLs; the ingress routes them to the backends.
+  gatewayUrl: ""
+  ingestionUrl: ""
+  retrievalUrl: ""
+  resources:
+    requests: { cpu: 25m, memory: 32Mi }
+    limits: { cpu: 200m, memory: 128Mi }
+
 migrations:
   enabled: true   # runs as a pre-install/pre-upgrade Helm hook Job
 

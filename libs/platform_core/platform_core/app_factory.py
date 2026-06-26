@@ -11,6 +11,7 @@ from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from .cache import close_redis, get_redis
@@ -105,6 +106,17 @@ def create_app(
         lifespan=lifespan,
         docs_url="/docs",
         openapi_url="/openapi.json",
+    )
+
+    # CORS for the browser SPA. Origins are configurable; credentials are not used
+    # (the frontend sends the JWT via the Authorization header, not cookies).
+    cors_origins = settings.cors_origin_list or ["*"]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
     if settings.prometheus_enabled:

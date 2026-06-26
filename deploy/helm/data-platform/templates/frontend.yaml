@@ -1,0 +1,57 @@
+{{- if .Values.frontend.enabled }}
+{{- $root := . -}}
+{{- $fe := .Values.frontend -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-frontend
+  labels: {{- include "dp.labels" (dict "name" "frontend" "root" $root) | nindent 4 }}
+spec:
+  replicas: {{ $fe.replicas }}
+  selector:
+    matchLabels: {{- include "dp.selectorLabels" (dict "name" "frontend" "root" $root) | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "dp.labels" (dict "name" "frontend" "root" $root) | nindent 8 }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: frontend
+          image: "{{ $fe.image.repository }}:{{ $fe.image.tag | default $root.Values.global.imageTag }}"
+          imagePullPolicy: {{ $root.Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: 8080
+          env:
+            # Empty -> the SPA uses relative URLs; the ingress routes /api/* to the
+            # backend services and / to this frontend (same origin, no CORS needed).
+            - { name: GATEWAY_URL, value: {{ $fe.gatewayUrl | quote }} }
+            - { name: INGESTION_URL, value: {{ $fe.ingestionUrl | quote }} }
+            - { name: RETRIEVAL_URL, value: {{ $fe.retrievalUrl | quote }} }
+          readinessProbe:
+            httpGet: { path: /index.html, port: 8080 }
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /index.html, port: 8080 }
+            initialDelaySeconds: 5
+            periodSeconds: 20
+          resources: {{- toYaml $fe.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities: { drop: ["ALL"] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-frontend
+  labels: {{- include "dp.labels" (dict "name" "frontend" "root" $root) | nindent 4 }}
+spec:
+  selector: {{- include "dp.selectorLabels" (dict "name" "frontend" "root" $root) | nindent 4 }}
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+{{- end }}
