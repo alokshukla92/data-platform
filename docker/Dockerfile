@@ -33,20 +33,27 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # ---- runtime: non-root, slim ----
 FROM base AS runtime
+# Fixed model cache location so a baked-in model is found by the non-root runtime
+# user (HF/sentence-transformers default to $HOME/.cache, which differs per user).
 ENV PATH="/opt/venv/bin:$PATH" \
-    PYTHONPATH="/app:/app/libs/platform_core"
+    PYTHONPATH="/app:/app/libs/platform_core" \
+    HF_HOME="/opt/hf-cache" \
+    SENTENCE_TRANSFORMERS_HOME="/opt/hf-cache"
 COPY --from=builder /opt/venv /opt/venv
 COPY . /app
 
-# Pre-download the default embedding model so pods start warm and don't hit the
-# network on first request (override with EMBEDDING_MODEL at build time if needed).
+# Pre-download the default embedding model into HF_HOME so pods start warm and
+# never hit the network on first request (override EMBEDDING_MODEL at build time).
 ARG PREFETCH_MODEL=true
 ARG EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
-RUN if [ "$PREFETCH_MODEL" = "true" ]; then \
-      python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('${EMBEDDING_MODEL}')" || true; \
+RUN mkdir -p /opt/hf-cache && \
+    if [ "$PREFETCH_MODEL" = "true" ]; then \
+      python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('${EMBEDDING_MODEL}')"; \
     fi
 
-RUN useradd --create-home --uid 10001 appuser && chown -R appuser:appuser /app
+# chown both the app and the model cache so appuser can read the baked model.
+RUN useradd --create-home --uid 10001 appuser \
+    && chown -R appuser:appuser /app /opt/hf-cache
 USER appuser
 
 EXPOSE 8000
