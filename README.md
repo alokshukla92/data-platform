@@ -80,6 +80,12 @@ open http://localhost:8001/docs   # ingestion
 open http://localhost:8002/docs   # retrieval
 open http://localhost:3000        # Grafana (anonymous admin)
 open http://localhost:9090        # Prometheus
+
+# Data stores (host ports; in-network the services use the default ports)
+# Postgres : localhost:5432   (DBeaver / psql)
+# Redis    : localhost:6380   (RedisInsight; 6380 avoids clashing with a local redis on 6379)
+#            db0=cache, db1=Celery broker/queues, db2=Celery results
+# MinIO    : localhost:9100 (API) / localhost:9101 (console)
 ```
 
 The frontend reads its API endpoints from a runtime-injected `config.js`, so the same
@@ -107,6 +113,34 @@ curl -s localhost:8002/api/v1/search -H "authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' \
   -d '{"query":"how does autoscaling work","mode":"hybrid","top_k":3}'
 ```
+
+## Data connectors
+
+Pluggable source connectors (each supports incremental sync, retry, rate limiting, and a
+`validate` connection check). Create/validate/sync them from the **Connectors** page in the
+UI or via `POST /api/v1/connectors`:
+
+| Type | Notes |
+|------|-------|
+| `rest` | JSON REST APIs (configurable records path, headers, rate limit) |
+| `csv` / `pdf` | usually uploaded on the Ingest page; also pullable from a URL |
+| `postgres` | external Postgres; keyset-incremental on a `cursor_field` |
+| `mysql` / `mariadb` | external MySQL/MariaDB via async `aiomysql`; the DSN is auto-normalised so plain `mysql://` / `mariadb://` URLs work. **Omit `table` to sync every table** — the primary key is auto-detected per table for keyset incremental sync (OFFSET pagination as fallback), with a per-table cursor |
+| `s3` | objects under a bucket/prefix |
+
+Example — sync an entire MariaDB database:
+
+```bash
+curl -s localhost:8000/api/v1/connectors -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"name":"shop","connector_type":"mariadb",
+       "config":{"dsn":"mariadb://user:pass@host.docker.internal:3306/shop","batch_size":500}}'
+# then POST /api/v1/connectors/{id}/validate  and  /api/v1/connectors/{id}/sync
+```
+
+Connector syncs commit progress per batch, so the job flips to `running` immediately and the
+Jobs page streams a live `ingested batch N (M records so far)` log instead of sitting on
+`pending` until completion.
 
 ## Local Kubernetes (kind + Helm + ArgoCD)
 
