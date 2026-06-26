@@ -3,7 +3,7 @@ import { api, ApiError } from "../lib/api";
 import type { Connector, ConnectorType } from "../lib/types";
 import { Alert, Field, Spinner } from "../components/ui";
 
-const TYPES: ConnectorType[] = ["postgres", "rest", "s3", "csv", "pdf"];
+const TYPES: ConnectorType[] = ["postgres", "mariadb", "mysql", "rest", "s3", "csv", "pdf"];
 
 // Starter config templates so users see the expected shape for each source type.
 const TEMPLATES: Record<ConnectorType, Record<string, unknown>> = {
@@ -13,6 +13,18 @@ const TEMPLATES: Record<ConnectorType, Record<string, unknown>> = {
     id_field: "id",
     cursor_field: "updated_at",
     content_fields: ["title", "description"],
+    batch_size: 500,
+  },
+  mariadb: {
+    dsn: "mariadb://user:pass@host.docker.internal:3306/mydb",
+    _hint: "Omit 'table' to sync ALL tables. Or set a single table + cursor_field.",
+    exclude_tables: [],
+    batch_size: 500,
+  },
+  mysql: {
+    dsn: "mysql://user:pass@host.docker.internal:3306/mydb",
+    _hint: "Omit 'table' to sync ALL tables. Or set a single table + cursor_field.",
+    exclude_tables: [],
     batch_size: 500,
   },
   rest: {

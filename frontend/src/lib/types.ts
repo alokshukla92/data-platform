@@ -47,7 +47,14 @@ export interface UploadResponse {
   idempotency_key: string;
 }
 
-export type ConnectorType = "rest" | "csv" | "pdf" | "postgres" | "s3";
+export type ConnectorType =
+  | "rest"
+  | "csv"
+  | "pdf"
+  | "postgres"
+  | "mysql"
+  | "mariadb"
+  | "s3";
 
 export interface Connector {
   id: string;

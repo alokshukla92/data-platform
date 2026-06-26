@@ -21,6 +21,8 @@ x-app-env: &app-env
   OMP_NUM_THREADS: "1"
   MKL_NUM_THREADS: "1"
   TOKENIZERS_PARALLELISM: "false"
+  # Use plain-HTTPS model downloads; the Xet chunked downloader stalls on some networks.
+  HF_HUB_DISABLE_XET: "1"
 
 x-app-build: &app-build
   # All services share ONE image (built once) to avoid duplicating the multi-GB
@@ -81,7 +83,7 @@ services:
     <<: *app-build
     environment: {<<: *app-env, SERVICE_NAME: gateway}
     command: ["uvicorn", "services.gateway.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
-    volumes: [".:/app"]
+    volumes: [".:/app", "hfcache:/opt/hf-cache"]
     ports: ["8000:8000"]
     depends_on:
       postgres: {condition: service_healthy}
@@ -92,7 +94,7 @@ services:
     <<: *app-build
     environment: {<<: *app-env, SERVICE_NAME: ingestion}
     command: ["uvicorn", "services.ingestion.app.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
-    volumes: [".:/app"]
+    volumes: [".:/app", "hfcache:/opt/hf-cache"]
     ports: ["8001:8001"]
     depends_on:
       postgres: {condition: service_healthy}
@@ -102,7 +104,7 @@ services:
     <<: *app-build
     environment: {<<: *app-env, SERVICE_NAME: retrieval}
     command: ["uvicorn", "services.retrieval.app.main:app", "--host", "0.0.0.0", "--port", "8002", "--reload"]
-    volumes: [".:/app"]
+    volumes: [".:/app", "hfcache:/opt/hf-cache"]
     ports: ["8002:8002"]
     depends_on:
       postgres: {condition: service_healthy}
@@ -113,7 +115,7 @@ services:
     environment: {<<: *app-env, SERVICE_NAME: worker}
     # threads pool avoids fork() so torch/OpenMP cannot deadlock in child workers.
     command: ["celery", "-A", "workers.celery_app.celery_app", "worker", "-Q", "ingest,embed", "--pool", "threads", "--concurrency", "4", "-l", "info"]
-    volumes: [".:/app"]
+    volumes: [".:/app", "hfcache:/opt/hf-cache"]
     depends_on:
       redis: {condition: service_healthy}
       postgres: {condition: service_healthy}
@@ -167,3 +169,6 @@ services:
 volumes:
   pgdata:
   miniodata:
+  # Persists the downloaded embedding model across container recreates so it is
+  # fetched from Hugging Face only once (not on every `up --force-recreate`).
+  hfcache:

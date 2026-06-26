@@ -30,6 +30,7 @@ __all__ = [
 # Import side-effects register the built-in connectors.
 from . import (  # noqa: E402,F401
     csv_connector,
+    mysql_connector,
     pdf_connector,
     postgres_connector,
     rest_connector,

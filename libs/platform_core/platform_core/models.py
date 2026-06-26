@@ -70,6 +70,8 @@ class ConnectorType(StrEnum):
     CSV = "csv"
     PDF = "pdf"
     POSTGRES = "postgres"
+    MYSQL = "mysql"
+    MARIADB = "mariadb"
     S3 = "s3"
 
 

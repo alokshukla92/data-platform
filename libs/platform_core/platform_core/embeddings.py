@@ -19,6 +19,10 @@ from functools import lru_cache
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+# Hugging Face's Xet chunked downloader can stall behind restrictive networks/proxies
+# (it never falls back on its own). Disable it so the model is pulled over plain HTTPS,
+# which resumes incrementally and is far more reliable in constrained environments.
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
 from .config import EmbeddingProvider as ProviderEnum
 from .config import Settings, get_settings
