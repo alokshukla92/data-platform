@@ -1,0 +1,42 @@
+# Production: high replicas, strict PDBs, KEDA + HPA, blue/green for the data plane.
+global:
+  environment: production
+  imageTag: stable
+  imagePullPolicy: IfNotPresent
+
+config:
+  LOG_LEVEL: INFO
+  OTEL_TRACES_SAMPLER_ARG: "0.1"   # sample 10% of traces to control cost at scale
+
+defaults:
+  replicas: 4
+  hpa: { enabled: true, minReplicas: 4, maxReplicas: 30, targetCPUUtilizationPercentage: 65, targetMemoryUtilizationPercentage: 75 }
+  pdb: { enabled: true, minAvailable: 3 }
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { cpu: "2", memory: 1.5Gi }
+
+services:
+  retrieval:
+    strategy: bluegreen
+    replicas: 6
+    resources:
+      requests: { cpu: 500m, memory: 1Gi }
+      limits: { cpu: "4", memory: 3Gi }
+
+workers:
+  ingest: { queues: "ingest", concurrency: 8, replicas: 4, hpa: { enabled: true, minReplicas: 4, maxReplicas: 50, targetCPUUtilizationPercentage: 65 }, keda: { enabled: true, listName: "ingest", listLength: "50" } }
+  embed: { queues: "embed", concurrency: 4, replicas: 3, hpa: { enabled: true, minReplicas: 2, maxReplicas: 20, targetCPUUtilizationPercentage: 70 }, keda: { enabled: true, listName: "embed", listLength: "20" } }
+
+ingress:
+  host: data-platform.example.com
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "25m"
+
+networkPolicy:
+  enabled: true
+
+# Secrets are injected by External Secrets Operator in production; placeholders only.
+secrets:
+  create: false

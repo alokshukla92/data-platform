@@ -1,0 +1,27 @@
+# Local kind cluster: single replicas, no autoscaling, model prefetch off.
+global:
+  environment: local
+  imageRegistry: data-platform
+  imageTag: dev
+  imagePullPolicy: IfNotPresent
+
+config:
+  LOG_JSON: "false"
+
+defaults:
+  replicas: 1
+  hpa: { enabled: false }
+  pdb: { enabled: false }
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+
+workers:
+  ingest: { queues: "ingest,embed", concurrency: 2, replicas: 1, hpa: { enabled: false }, keda: { enabled: false } }
+  embed: { queues: "embed", concurrency: 1, replicas: 0, hpa: { enabled: false } }
+
+ingress:
+  host: data-platform.local
+
+networkPolicy:
+  enabled: false

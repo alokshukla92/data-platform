@@ -1,0 +1,109 @@
+# Default values (production-leaning). Per-environment overrides live in values-<env>.yaml.
+global:
+  environment: production
+  imageRegistry: ghcr.io/your-org/data-platform
+  imageTag: latest
+  imagePullPolicy: IfNotPresent
+
+# Non-secret config -> ConfigMap. Secrets -> Secret (see secrets section).
+config:
+  LOG_LEVEL: INFO
+  LOG_JSON: "true"
+  EMBEDDING_PROVIDER: local
+  EMBEDDING_MODEL: sentence-transformers/all-MiniLM-L6-v2
+  EMBEDDING_DIM: "384"
+  CACHE_TTL_SECONDS: "300"
+  RATE_LIMIT_DEFAULT: 100/minute
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+  PROMETHEUS_ENABLED: "true"
+
+# In real clusters these come from an external secret manager (Sealed Secrets / External
+# Secrets Operator / Vault). Placeholder values here are overridden per environment.
+secrets:
+  create: true
+  data:
+    POSTGRES_HOST: postgres
+    POSTGRES_PORT: "5432"
+    POSTGRES_USER: platform
+    POSTGRES_PASSWORD: changeme
+    POSTGRES_DB: platform
+    REDIS_URL: redis://redis-master:6379/0
+    CELERY_BROKER_URL: redis://redis-master:6379/1
+    CELERY_RESULT_BACKEND: redis://redis-master:6379/2
+    JWT_SECRET_KEY: changeme-prod
+    API_KEY_SALT: changeme-prod
+
+# Shared defaults applied to every service unless overridden.
+defaults:
+  replicas: 2
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: "1", memory: 768Mi }
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  pdb:
+    enabled: true
+    minAvailable: 1
+  # Rolling update is the default; set strategy=bluegreen to use Argo Rollouts.
+  strategy: rolling
+  rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+
+services:
+  gateway:
+    command: ["gunicorn", "services.gateway.app.main:app", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000", "--workers", "2"]
+    port: 8000
+    ingressPath: /api/v1/auth
+    extraIngressPaths: ["/api/v1/api-keys", "/api/v1/connectors"]
+  ingestion:
+    command: ["gunicorn", "services.ingestion.app.main:app", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000", "--workers", "2"]
+    port: 8000
+    ingressPath: /api/v1/ingest
+    extraIngressPaths: ["/api/v1/jobs"]
+  retrieval:
+    command: ["gunicorn", "services.retrieval.app.main:app", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000", "--workers", "2"]
+    port: 8000
+    ingressPath: /api/v1/search
+    resources:
+      requests: { cpu: 250m, memory: 512Mi }   # embedding model needs more memory
+      limits: { cpu: "2", memory: 2Gi }
+
+# Celery workers (separate deployment, autoscaled on queue depth via KEDA when available).
+workers:
+  ingest:
+    queues: "ingest"
+    concurrency: 4
+    replicas: 2
+    hpa: { enabled: true, minReplicas: 2, maxReplicas: 20, targetCPUUtilizationPercentage: 75 }
+    keda:
+      enabled: false   # set true in staging/prod; scales on Redis list length
+      listName: "ingest"
+      listLength: "20"
+  embed:
+    queues: "embed"
+    concurrency: 2
+    replicas: 1
+    hpa: { enabled: true, minReplicas: 1, maxReplicas: 8, targetCPUUtilizationPercentage: 80 }
+
+beat:
+  enabled: true
+
+migrations:
+  enabled: true   # runs as a pre-install/pre-upgrade Helm hook Job
+
+ingress:
+  enabled: true
+  className: nginx
+  host: data-platform.local
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+
+networkPolicy:
+  enabled: true
+
+serviceAccount:
+  create: true
+  name: data-platform

@@ -1,0 +1,103 @@
+{{- $root := . -}}
+{{- range $name, $svc := .Values.services }}
+{{- $cfg := mergeOverwrite (deepCopy $root.Values.defaults) $svc }}
+{{- if ne $cfg.strategy "bluegreen" }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $root.Release.Name }}-{{ $name }}
+  labels: {{- include "dp.labels" (dict "name" $name "root" $root) | nindent 4 }}
+spec:
+  replicas: {{ $cfg.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: {{ $cfg.rollingUpdate.maxSurge }}
+      maxUnavailable: {{ $cfg.rollingUpdate.maxUnavailable }}
+  selector:
+    matchLabels: {{- include "dp.selectorLabels" (dict "name" $name "root" $root) | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "dp.labels" (dict "name" $name "root" $root) | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ $svc.port | quote }}
+        prometheus.io/path: /metrics
+    spec:
+      serviceAccountName: {{ $root.Values.serviceAccount.name }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      # Give in-flight requests time to drain before SIGTERM (matches app grace window).
+      terminationGracePeriodSeconds: 40
+      containers:
+        - name: {{ $name }}
+          image: {{ include "dp.image" $root }}
+          imagePullPolicy: {{ $root.Values.global.imagePullPolicy }}
+          command: {{ toJson $svc.command }}
+          ports:
+            - { name: http, containerPort: {{ $svc.port }} }
+          {{- include "dp.env" (dict "name" $name "Release" $root.Release "Values" $root.Values) | nindent 10 }}
+          {{- include "dp.probes" . | nindent 10 }}
+          lifecycle:
+            preStop:
+              exec: { command: ["sh", "-c", "sleep 5"] }   # let LB deregister first
+          resources: {{- toYaml $cfg.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities: { drop: ["ALL"] }
+{{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $root.Release.Name }}-{{ $name }}
+  labels: {{- include "dp.labels" (dict "name" $name "root" $root) | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector: {{- include "dp.selectorLabels" (dict "name" $name "root" $root) | nindent 4 }}
+  ports:
+    - { name: http, port: 80, targetPort: http }
+{{- if $cfg.hpa.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $root.Release.Name }}-{{ $name }}
+  labels: {{- include "dp.labels" (dict "name" $name "root" $root) | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $root.Release.Name }}-{{ $name }}
+  minReplicas: {{ $cfg.hpa.minReplicas }}
+  maxReplicas: {{ $cfg.hpa.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: {{ $cfg.hpa.targetCPUUtilizationPercentage }} }
+    - type: Resource
+      resource:
+        name: memory
+        target: { type: Utilization, averageUtilization: {{ $cfg.hpa.targetMemoryUtilizationPercentage }} }
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300   # avoid flapping
+{{- end }}
+{{- if $cfg.pdb.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $root.Release.Name }}-{{ $name }}
+  labels: {{- include "dp.labels" (dict "name" $name "root" $root) | nindent 4 }}
+spec:
+  minAvailable: {{ $cfg.pdb.minAvailable }}
+  selector:
+    matchLabels: {{- include "dp.selectorLabels" (dict "name" $name "root" $root) | nindent 6 }}
+{{- end }}
+{{- end }}

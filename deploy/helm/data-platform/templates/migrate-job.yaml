@@ -1,0 +1,26 @@
+{{- if .Values.migrations.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-migrate
+  labels: {{- include "dp.labels" (dict "name" "migrate" "root" .) | nindent 4 }}
+  annotations:
+    # Run before the app starts (install/upgrade) and clean up old jobs.
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels: {{- include "dp.selectorLabels" (dict "name" "migrate" "root" .) | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      containers:
+        - name: migrate
+          image: {{ include "dp.image" . }}
+          command: ["alembic", "upgrade", "head"]
+          {{- include "dp.env" (dict "name" "migrate" "Release" .Release "Values" .Values) | nindent 10 }}
+{{- end }}

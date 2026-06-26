@@ -1,0 +1,106 @@
+{{- $root := . -}}
+{{- range $name, $w := .Values.workers }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $root.Release.Name }}-worker-{{ $name }}
+  labels: {{- include "dp.labels" (dict "name" (printf "worker-%s" $name) "root" $root) | nindent 4 }}
+spec:
+  replicas: {{ $w.replicas }}
+  selector:
+    matchLabels: {{- include "dp.selectorLabels" (dict "name" (printf "worker-%s" $name) "root" $root) | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "dp.labels" (dict "name" (printf "worker-%s" $name) "root" $root) | nindent 8 }}
+    spec:
+      serviceAccountName: {{ $root.Values.serviceAccount.name }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      # Celery's warm shutdown finishes the current task before exiting.
+      terminationGracePeriodSeconds: 120
+      containers:
+        - name: worker-{{ $name }}
+          image: {{ include "dp.image" $root }}
+          command:
+            - celery
+            - -A
+            - workers.celery_app.celery_app
+            - worker
+            - -Q
+            - {{ $w.queues | quote }}
+            - --concurrency
+            - {{ $w.concurrency | quote }}
+            - -l
+            - info
+          {{- include "dp.env" (dict "name" (printf "worker-%s" $name) "Release" $root.Release "Values" $root.Values) | nindent 10 }}
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "celery -A workers.celery_app.celery_app inspect ping -d celery@$HOSTNAME"]
+            initialDelaySeconds: 30
+            periodSeconds: 60
+            timeoutSeconds: 15
+          resources: {{- toYaml $root.Values.defaults.resources | nindent 12 }}
+{{- if and $w.keda $w.keda.enabled }}
+---
+# KEDA scales workers on Redis queue depth (scales to zero when idle).
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ $root.Release.Name }}-worker-{{ $name }}
+spec:
+  scaleTargetRef:
+    name: {{ $root.Release.Name }}-worker-{{ $name }}
+  minReplicaCount: {{ $w.hpa.minReplicas }}
+  maxReplicaCount: {{ $w.hpa.maxReplicas }}
+  triggers:
+    - type: redis
+      metadata:
+        addressFromEnv: REDIS_URL
+        listName: {{ $w.keda.listName | quote }}
+        listLength: {{ $w.keda.listLength | quote }}
+{{- else if $w.hpa.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $root.Release.Name }}-worker-{{ $name }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $root.Release.Name }}-worker-{{ $name }}
+  minReplicas: {{ $w.hpa.minReplicas }}
+  maxReplicas: {{ $w.hpa.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: {{ $w.hpa.targetCPUUtilizationPercentage }} }
+{{- end }}
+{{- end }}
+{{- if .Values.beat.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-beat
+  labels: {{- include "dp.labels" (dict "name" "beat" "root" .) | nindent 4 }}
+spec:
+  replicas: 1   # singleton scheduler
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: {{- include "dp.selectorLabels" (dict "name" "beat" "root" .) | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "dp.labels" (dict "name" "beat" "root" .) | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      containers:
+        - name: beat
+          image: {{ include "dp.image" . }}
+          command: ["celery", "-A", "workers.celery_app.celery_app", "beat", "-l", "info"]
+          {{- include "dp.env" (dict "name" "beat" "Release" .Release "Values" .Values) | nindent 10 }}
+          resources: {{- toYaml .Values.defaults.resources | nindent 12 }}
+{{- end }}

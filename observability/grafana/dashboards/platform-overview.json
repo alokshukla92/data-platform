@@ -1,0 +1,85 @@
+{
+  "title": "Data Platform - Overview",
+  "uid": "data-platform-overview",
+  "schemaVersion": 39,
+  "editable": true,
+  "tags": ["data-platform"],
+  "time": { "from": "now-1h", "to": "now" },
+  "refresh": "30s",
+  "templating": {
+    "list": [
+      {
+        "name": "job",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(http_requests_total, job)",
+        "includeAll": true,
+        "multi": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Request rate (RPS) by service",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "sum(rate(http_requests_total{job=~\"$job\"}[5m])) by (job)", "legendFormat": "{{job}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Error rate (5xx %)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "sum(rate(http_requests_total{status=~\"5..\",job=~\"$job\"}[5m])) by (job) / sum(rate(http_requests_total{job=~\"$job\"}[5m])) by (job)", "legendFormat": "{{job}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency p50 / p95 / p99",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=~\"$job\"}[5m])) by (le))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=~\"$job\"}[5m])) by (le))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=~\"$job\"}[5m])) by (le))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Ingestion jobs by status",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "sum(rate(ingest_jobs_total[5m])) by (status)", "legendFormat": "{{status}}" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Dead-letter queue depth",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 16 },
+      "targets": [{ "expr": "sum(dlq_depth)" }]
+    },
+    {
+      "type": "stat",
+      "title": "Circuit breakers open",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 16 },
+      "targets": [{ "expr": "count(circuit_breaker_state == 2) or vector(0)" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Cache hit ratio",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 16 },
+      "targets": [
+        { "expr": "sum(rate(cache_events_total{result=\"hit\"}[5m])) / clamp_min(sum(rate(cache_events_total[5m])), 1)", "legendFormat": "hit ratio" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Search requests by mode",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 16 },
+      "targets": [
+        { "expr": "sum(rate(search_requests_total[5m])) by (mode)", "legendFormat": "{{mode}}" }
+      ]
+    }
+  ]
+}

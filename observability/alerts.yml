@@ -1,0 +1,58 @@
+groups:
+  - name: data-platform-slos
+    rules:
+      # ---- Availability / latency (RED method) ----
+      - alert: HighHttp5xxRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m])) by (job)
+            / sum(rate(http_requests_total[5m])) by (job) > 0.05
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "High 5xx error rate on {{ $labels.job }}"
+          description: ">5% of requests are failing for 5m."
+
+      - alert: HighRequestLatencyP95
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, job)) > 1
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "p95 latency > 1s on {{ $labels.job }}"
+
+      # ---- Async pipeline health ----
+      - alert: DeadLetterQueueGrowing
+        expr: dlq_depth > 0
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Jobs are accumulating in the dead-letter queue"
+          description: "{{ $value }} jobs dead-lettered; investigate connector/source failures."
+
+      - alert: JobProcessingSlow
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(job_processing_seconds_bucket[10m])) by (le, job_type)) > 120
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "Job processing p95 > 120s for {{ $labels.job_type }}"
+
+      # ---- Reliability ----
+      - alert: CircuitBreakerOpen
+        expr: circuit_breaker_state == 2
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Circuit breaker {{ $labels.name }} is OPEN"
+          description: "A downstream dependency is failing; calls are being short-circuited."
+
+      - alert: LowCacheHitRatio
+        expr: |
+          sum(rate(cache_events_total{result="hit"}[10m]))
+            / clamp_min(sum(rate(cache_events_total[10m])), 1) < 0.5
+        for: 15m
+        labels: { severity: info }
+        annotations:
+          summary: "Cache hit ratio < 50%"

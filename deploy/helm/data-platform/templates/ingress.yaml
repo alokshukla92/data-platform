@@ -1,0 +1,33 @@
+{{- if .Values.ingress.enabled }}
+{{- $root := . -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app.kubernetes.io/part-of: data-platform
+  annotations:
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+        {{- range $name, $svc := .Values.services }}
+          - path: {{ $svc.ingressPath }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $root.Release.Name }}-{{ $name }}
+                port: { number: 80 }
+          {{- range $p := ($svc.extraIngressPaths | default list) }}
+          - path: {{ $p }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $root.Release.Name }}-{{ $name }}
+                port: { number: 80 }
+          {{- end }}
+        {{- end }}
+{{- end }}

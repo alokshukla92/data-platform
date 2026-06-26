@@ -1,0 +1,36 @@
+# Chaos Mesh experiment: randomly kill a retrieval pod every 2 minutes.
+# Validates self-healing (Deployment recreates pods) and that PDBs + multiple
+# replicas keep the service available during disruption.
+# Apply: kubectl apply -f tests/chaos/pod-kill.yaml  (requires Chaos Mesh installed)
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: retrieval-pod-kill
+  namespace: data-platform
+spec:
+  action: pod-kill
+  mode: one
+  selector:
+    namespaces: [data-platform]
+    labelSelectors:
+      app.kubernetes.io/name: retrieval
+  scheduler:
+    cron: "@every 2m"
+---
+# Inject 200ms latency to Postgres to test timeouts, retries, and circuit breakers.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: postgres-latency
+  namespace: data-platform
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces: [data-platform]
+    labelSelectors:
+      app.kubernetes.io/name: postgres
+  delay:
+    latency: "200ms"
+    jitter: "50ms"
+  duration: "5m"

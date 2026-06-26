@@ -1,0 +1,81 @@
+{{- $root := . -}}
+{{- range $name, $svc := .Values.services }}
+{{- $cfg := mergeOverwrite (deepCopy $root.Values.defaults) $svc }}
+{{- if eq $cfg.strategy "bluegreen" }}
+---
+# Argo Rollouts blue/green: a new (green) ReplicaSet is spun up alongside the live (blue)
+# one. Traffic is promoted to green only after the preview service passes checks.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ $root.Release.Name }}-{{ $name }}
+  labels: {{- include "dp.labels" (dict "name" $name "root" $root) | nindent 4 }}
+spec:
+  replicas: {{ $cfg.replicas }}
+  selector:
+    matchLabels: {{- include "dp.selectorLabels" (dict "name" $name "root" $root) | nindent 6 }}
+  strategy:
+    blueGreen:
+      activeService: {{ $root.Release.Name }}-{{ $name }}
+      previewService: {{ $root.Release.Name }}-{{ $name }}-preview
+      autoPromotionEnabled: false      # require manual / analysis-gated promotion
+      scaleDownDelaySeconds: 30
+      prePromotionAnalysis:
+        templates:
+          - templateName: {{ $root.Release.Name }}-success-rate
+  template:
+    metadata:
+      labels: {{- include "dp.labels" (dict "name" $name "root" $root) | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ $svc.port | quote }}
+    spec:
+      serviceAccountName: {{ $root.Values.serviceAccount.name }}
+      securityContext: { runAsNonRoot: true, runAsUser: 10001 }
+      terminationGracePeriodSeconds: 40
+      containers:
+        - name: {{ $name }}
+          image: {{ include "dp.image" $root }}
+          command: {{ toJson $svc.command }}
+          ports:
+            - { name: http, containerPort: {{ $svc.port }} }
+          {{- include "dp.env" (dict "name" $name "Release" $root.Release "Values" $root.Values) | nindent 10 }}
+          {{- include "dp.probes" . | nindent 10 }}
+          resources: {{- toYaml $cfg.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $root.Release.Name }}-{{ $name }}-preview
+  labels: {{- include "dp.labels" (dict "name" $name "root" $root) | nindent 4 }}
+spec:
+  selector: {{- include "dp.selectorLabels" (dict "name" $name "root" $root) | nindent 4 }}
+  ports:
+    - { name: http, port: 80, targetPort: http }
+{{- end }}
+{{- end }}
+{{- $hasBlueGreen := false -}}
+{{- range $name, $svc := .Values.services }}
+{{- $cfg := mergeOverwrite (deepCopy $.Values.defaults) $svc }}
+{{- if eq $cfg.strategy "bluegreen" }}{{- $hasBlueGreen = true }}{{- end }}
+{{- end }}
+{{- if $hasBlueGreen }}
+---
+# AnalysisTemplate used by blue/green prePromotion: promote only if success rate is healthy.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: {{ .Release.Name }}-success-rate
+spec:
+  metrics:
+    - name: success-rate
+      interval: 30s
+      count: 3
+      successCondition: result >= 0.95
+      provider:
+        prometheus:
+          address: http://prometheus.monitoring:9090
+          query: |
+            sum(rate(http_requests_total{status!~"5.."}[2m]))
+              / sum(rate(http_requests_total[2m]))
+{{- end }}

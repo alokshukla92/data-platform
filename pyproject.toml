@@ -1,0 +1,122 @@
+[project]
+name = "data-platform"
+version = "0.1.0"
+description = "Enterprise Data Intelligence Platform - FastAPI microservices, Celery, pgvector, Kubernetes-native"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Platform Engineering" }]
+
+dependencies = [
+    # Web / API
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.30",
+    "gunicorn>=22.0",
+    "pydantic[email]>=2.7",
+    "pydantic-settings>=2.3",
+    "python-multipart>=0.0.9",
+    # Database
+    "sqlalchemy[asyncio]>=2.0.30",
+    "asyncpg>=0.29",
+    "alembic>=1.13",
+    "pgvector>=0.3.0",
+    "greenlet>=3.0",
+    # Cache / Queue
+    "redis>=5.0",
+    "celery>=5.4",
+    "kombu>=5.3",
+    # Connectors
+    "httpx>=0.27",
+    "boto3>=1.34",
+    "pypdf>=4.2",
+    "pandas>=2.2",
+    # AI / Embeddings (pluggable; local default)
+    "sentence-transformers>=3.0",
+    "numpy>=1.26",
+    # Reliability
+    "tenacity>=8.3",
+    "limits>=3.12",
+    # Security
+    "pyjwt[crypto]>=2.8",
+    "passlib[bcrypt]>=1.7",
+    "argon2-cffi>=23.1",
+    # Observability
+    "structlog>=24.1",
+    "opentelemetry-sdk>=1.25",
+    "opentelemetry-api>=1.25",
+    "opentelemetry-exporter-otlp>=1.25",
+    "opentelemetry-instrumentation-fastapi>=0.46b0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.46b0",
+    "opentelemetry-instrumentation-redis>=0.46b0",
+    "opentelemetry-instrumentation-celery>=0.46b0",
+    "prometheus-client>=0.20",
+    "prometheus-fastapi-instrumentator>=7.0",
+    "elastic-apm>=6.22",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.4.8",
+    "mypy>=1.10",
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+    "httpx>=0.27",
+    "fakeredis>=2.23",
+    "moto[s3]>=5.0",
+    "respx>=0.21",
+    "types-redis",
+    "locust>=2.29",
+    "bandit>=1.7",
+    "pip-audit>=2.7",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["libs/platform_core/platform_core"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["libs", "services", "workers", "connectors", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "C4", "SIM", "ASYNC", "S"]
+# B008: FastAPI uses callables in defaults (Depends/Header). UP046: pydantic generics still
+# use Generic[T] for broad compatibility.
+ignore = ["S101", "B008", "UP046"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "B"]
+# Default values are non-secret local placeholders, overridden by env/Secrets in real envs.
+"libs/platform_core/platform_core/config.py" = ["S105"]
+"libs/platform_core/platform_core/schemas.py" = ["S105"]
+# Telemetry/logging must never raise into the app path, hence broad swallow.
+"libs/platform_core/platform_core/telemetry.py" = ["S110", "S112"]
+"libs/platform_core/platform_core/logging.py" = ["S110"]
+# SQL is parameterised for all values; identifiers are validated before interpolation.
+"libs/platform_core/platform_core/search.py" = ["S608"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = false
+plugins = ["pydantic.mypy"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "unit: unit tests",
+    "integration: integration tests requiring services",
+]
+
+[tool.coverage.run]
+source = ["libs/platform_core/platform_core", "services", "workers", "connectors"]
+omit = ["*/tests/*", "*/migrations/*"]
