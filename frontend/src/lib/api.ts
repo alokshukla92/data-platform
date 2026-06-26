@@ -4,6 +4,7 @@ import type {
   ConnectorType,
   ConnectorValidation,
   Job,
+  JobEvent,
   Page,
   Principal,
   SearchMode,
@@ -115,6 +116,9 @@ export const api = {
   },
   getJob(id: string) {
     return request<Job>(API.ingestion, `/api/v1/jobs/${id}`);
+  },
+  getJobHistory(id: string) {
+    return request<JobEvent[]>(API.ingestion, `/api/v1/jobs/${id}/history`);
   },
 
   // ---- connectors (gateway) ----

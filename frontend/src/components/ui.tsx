@@ -13,7 +13,7 @@ export function Spinner({ className = "" }: { className?: string }) {
 const STATUS_STYLES: Record<string, string> = {
   succeeded: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
   pending: "bg-amber-500/15 text-amber-300 border-amber-500/30",
-  processing: "bg-sky-500/15 text-sky-300 border-sky-500/30",
+  running: "bg-sky-500/15 text-sky-300 border-sky-500/30",
   retrying: "bg-sky-500/15 text-sky-300 border-sky-500/30",
   failed: "bg-rose-500/15 text-rose-300 border-rose-500/30",
   dead_lettered: "bg-rose-500/15 text-rose-300 border-rose-500/30",

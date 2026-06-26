@@ -15,7 +15,7 @@ export interface Principal {
 
 export type JobStatus =
   | "pending"
-  | "processing"
+  | "running"
   | "succeeded"
   | "failed"
   | "dead_lettered"
@@ -32,6 +32,13 @@ export interface Job {
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
+}
+
+export interface JobEvent {
+  status: JobStatus;
+  message: string | null;
+  event_metadata: Record<string, unknown>;
+  created_at: string;
 }
 
 export interface Page<T> {
