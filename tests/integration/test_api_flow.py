@@ -14,9 +14,11 @@ import pytest
 
 pytestmark = pytest.mark.integration
 
-GATEWAY = "http://localhost:8000"
-INGESTION = "http://localhost:8001"
-RETRIEVAL = "http://localhost:8002"
+# 127.0.0.1 (not "localhost") so httpx doesn't resolve to ::1 while the stack
+# is published on IPv4 0.0.0.0 by docker-compose.
+GATEWAY = "http://127.0.0.1:8000"
+INGESTION = "http://127.0.0.1:8001"
+RETRIEVAL = "http://127.0.0.1:8002"
 
 
 @pytest.fixture(scope="module")

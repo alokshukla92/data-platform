@@ -73,9 +73,7 @@ async def _principal_from_api_key(raw_key: str, db: AsyncSession) -> Principal:
 def require_role(minimum: Role):
     async def _dep(principal: Principal = Depends(get_principal)) -> Principal:
         if not role_allows(principal.role, minimum):
-            raise HTTPException(
-                status.HTTP_403_FORBIDDEN, f"Requires role >= {minimum.value}"
-            )
+            raise HTTPException(status.HTTP_403_FORBIDDEN, f"Requires role >= {minimum.value}")
         return principal
 
     return _dep

@@ -12,6 +12,10 @@ config:
   EMBEDDING_PROVIDER: local
   EMBEDDING_MODEL: sentence-transformers/all-MiniLM-L6-v2
   EMBEDDING_DIM: "384"
+  # PyTorch/OpenMP fork-safety: keep BLAS single-threaded in containers.
+  OMP_NUM_THREADS: "1"
+  MKL_NUM_THREADS: "1"
+  TOKENIZERS_PARALLELISM: "false"
   CACHE_TTL_SECONDS: "300"
   RATE_LIMIT_DEFAULT: 100/minute
   OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317

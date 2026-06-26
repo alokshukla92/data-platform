@@ -7,7 +7,6 @@ telemetry, metrics, health probes, and graceful shutdown behave identically.
 from __future__ import annotations
 
 import asyncio
-import signal
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 
@@ -82,8 +81,13 @@ def create_app(
         instrument_clients()
         if on_startup:
             await on_startup()
-        _install_signal_handlers()
         yield
+        # NOTE: we deliberately do NOT install our own SIGTERM/SIGINT handlers.
+        # uvicorn already owns those signals; overriding them via
+        # loop.add_signal_handler swallows the signal and prevents both graceful
+        # shutdown and --reload. Kubernetes drains the load balancer via a
+        # container preStop hook (see Helm deployment) before SIGTERM is sent, at
+        # which point this lifespan-shutdown block flips readiness to draining.
         global _shutting_down
         _shutting_down = True
         log.info("service_draining", service=service_name)
@@ -113,18 +117,3 @@ def create_app(
     for router in routers or []:
         app.include_router(router)
     return app
-
-
-def _install_signal_handlers() -> None:
-    global _shutting_down
-
-    def _handle(*_: object) -> None:
-        global _shutting_down
-        _shutting_down = True
-
-    try:
-        loop = asyncio.get_event_loop()
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(sig, _handle)
-    except (NotImplementedError, RuntimeError):  # pragma: no cover - non-unix / no loop
-        pass

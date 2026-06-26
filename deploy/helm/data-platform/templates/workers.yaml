@@ -30,6 +30,8 @@ spec:
             - worker
             - -Q
             - {{ $w.queues | quote }}
+            - --pool
+            - threads
             - --concurrency
             - {{ $w.concurrency | quote }}
             - -l

@@ -41,10 +41,10 @@ async def semantic_search(
     stmt = text(
         f"""
         SELECT dc.id, dc.document_id, dc.content, dc.chunk_metadata,
-               1 - (dc.embedding <=> :qvec) AS score
+               1 - (dc.embedding <=> (:qvec)::vector) AS score
         FROM document_chunks dc
         WHERE dc.tenant_id = :tid AND dc.embedding IS NOT NULL {mf_sql}
-        ORDER BY dc.embedding <=> :qvec ASC
+        ORDER BY dc.embedding <=> (:qvec)::vector ASC
         LIMIT :k
         """
     ).bindparams(bindparam("qvec", value=str(vector)))

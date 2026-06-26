@@ -43,6 +43,7 @@ async def bootstrap_tenant(payload: TenantBootstrap, db: AsyncSession = Depends(
         role=Role.ADMIN,
     )
     db.add(admin)
+    await db.flush()  # populate admin.id before returning
     return {"tenant_id": str(tenant.id), "admin_id": str(admin.id)}
 
 
@@ -54,9 +55,7 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)) -> To
     if not user or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
     settings = get_settings()
-    token = create_access_token(
-        subject=str(user.id), tenant_id=str(user.tenant_id), role=user.role
-    )
+    token = create_access_token(subject=str(user.id), tenant_id=str(user.tenant_id), role=user.role)
     return TokenResponse(access_token=token, expires_in=settings.jwt_access_ttl_minutes * 60)
 
 

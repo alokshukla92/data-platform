@@ -60,6 +60,4 @@ class PdfConnector(BaseConnector):
                         )
                     )
             page += per_batch
-            yield SyncResult(
-                records=records, next_cursor={"page": page}, has_more=page < total
-            )
+            yield SyncResult(records=records, next_cursor={"page": page}, has_more=page < total)

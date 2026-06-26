@@ -36,3 +36,8 @@ models/
 # Local data
 data/
 *.sqlite3
+
+# Celery beat runtime schedule
+celerybeat-schedule
+celerybeat-schedule.*
+celerybeat.pid

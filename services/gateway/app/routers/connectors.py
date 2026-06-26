@@ -30,9 +30,10 @@ async def create_connector(
     principal: Principal = Depends(require_role(Role.EDITOR)),
     db: AsyncSession = Depends(get_db),
 ) -> ConnectorOut:
-    if payload.connector_type.value not in __import__(
-        "platform_core.connectors", fromlist=["registry"]
-    ).registry:
+    if (
+        payload.connector_type.value
+        not in __import__("platform_core.connectors", fromlist=["registry"]).registry
+    ):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unsupported connector type")
     cc = ConnectorConfig(
         tenant_id=uuid.UUID(principal.tenant_id),
@@ -63,14 +64,18 @@ async def list_connectors(
         )
     ).scalar_one()
     rows = (
-        await db.execute(
-            select(ConnectorConfig)
-            .where(ConnectorConfig.tenant_id == tid)
-            .order_by(ConnectorConfig.created_at.desc())
-            .limit(min(limit, 200))
-            .offset(offset)
+        (
+            await db.execute(
+                select(ConnectorConfig)
+                .where(ConnectorConfig.tenant_id == tid)
+                .order_by(ConnectorConfig.created_at.desc())
+                .limit(min(limit, 200))
+                .offset(offset)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return Page(
         items=[ConnectorOut.model_validate(r) for r in rows],
         total=int(total),

@@ -24,9 +24,7 @@ JOB_PROCESSING_SECONDS = Histogram(
 EMBEDDINGS_GENERATED_TOTAL = Counter(
     "embeddings_generated_total", "Embeddings generated", ["provider"]
 )
-SEARCH_REQUESTS_TOTAL = Counter(
-    "search_requests_total", "Context search requests", ["mode"]
-)
+SEARCH_REQUESTS_TOTAL = Counter("search_requests_total", "Context search requests", ["mode"])
 CIRCUIT_BREAKER_STATE = Gauge(
     "circuit_breaker_state", "Circuit breaker state (0=closed,1=half_open,2=open)", ["name"]
 )

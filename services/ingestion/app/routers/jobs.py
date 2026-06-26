@@ -31,14 +31,18 @@ async def list_jobs(
         await db.execute(select(func.count()).select_from(IngestionJob).where(*conditions))
     ).scalar_one()
     rows = (
-        await db.execute(
-            select(IngestionJob)
-            .where(*conditions)
-            .order_by(IngestionJob.created_at.desc())
-            .limit(min(limit, 200))
-            .offset(offset)
+        (
+            await db.execute(
+                select(IngestionJob)
+                .where(*conditions)
+                .order_by(IngestionJob.created_at.desc())
+                .limit(min(limit, 200))
+                .offset(offset)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return Page(
         items=[JobOut.model_validate(r) for r in rows],
         total=int(total),
@@ -84,8 +88,14 @@ async def job_history(
     if not owns:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
     events = (
-        await db.execute(
-            select(JobEvent).where(JobEvent.job_id == job_id).order_by(JobEvent.created_at.asc())
+        (
+            await db.execute(
+                select(JobEvent)
+                .where(JobEvent.job_id == job_id)
+                .order_by(JobEvent.created_at.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [JobEventOut.model_validate(e) for e in events]

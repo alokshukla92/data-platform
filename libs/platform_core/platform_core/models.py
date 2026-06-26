@@ -191,9 +191,7 @@ class Document(TimestampMixin, Base):
         back_populates="document", cascade="all, delete-orphan"
     )
 
-    __table_args__ = (
-        UniqueConstraint("tenant_id", "content_hash", name="uq_doc_content_hash"),
-    )
+    __table_args__ = (UniqueConstraint("tenant_id", "content_hash", name="uq_doc_content_hash"),)
 
 
 class DocumentChunk(TimestampMixin, Base):
@@ -213,9 +211,7 @@ class DocumentChunk(TimestampMixin, Base):
 
     document: Mapped[Document] = relationship(back_populates="chunks")
 
-    __table_args__ = (
-        UniqueConstraint("document_id", "chunk_index", name="uq_chunk_doc_index"),
-    )
+    __table_args__ = (UniqueConstraint("document_id", "chunk_index", name="uq_chunk_doc_index"),)
 
 
 # --------------------------------------------------------------------------- audit

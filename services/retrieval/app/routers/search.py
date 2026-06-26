@@ -67,6 +67,4 @@ async def context(
     """Assemble a single context window (for RAG/LLM prompts) from the top hits."""
     hits = await _dispatch(db, principal.tenant_id, req)
     blocks = [f"[{i + 1}] {h.content}" for i, h in enumerate(hits)]
-    return ContextResponse(
-        query=req.query, context="\n\n".join(blocks), citations=hits
-    )
+    return ContextResponse(query=req.query, context="\n\n".join(blocks), citations=hits)

@@ -46,9 +46,7 @@ async def upsert_document(
 
     existing = (
         await db.execute(
-            select(Document).where(
-                Document.tenant_id == tenant_id, Document.content_hash == chash
-            )
+            select(Document).where(Document.tenant_id == tenant_id, Document.content_hash == chash)
         )
     ).scalar_one_or_none()
     if existing is not None:

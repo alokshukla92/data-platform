@@ -37,9 +37,11 @@ def verify_password(password: str, hashed: str) -> bool:
 
 # --------------------------------------------------------------------------- JWT
 def create_access_token(
-    *, subject: str, tenant_id: str, role: Role, settings: Settings | None = None
+    *, subject: str, tenant_id: str, role: Role | str, settings: Settings | None = None
 ) -> str:
     settings = settings or get_settings()
+    # The ORM may hand us a plain string for the role; normalise to the enum.
+    role = role if isinstance(role, Role) else Role(role)
     now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "sub": subject,
@@ -68,9 +70,7 @@ def generate_api_key() -> tuple[str, str, str]:
 
 def hash_api_key(full_key: str, settings: Settings | None = None) -> str:
     settings = settings or get_settings()
-    return hmac.new(
-        settings.api_key_salt.encode(), full_key.encode(), hashlib.sha256
-    ).hexdigest()
+    return hmac.new(settings.api_key_salt.encode(), full_key.encode(), hashlib.sha256).hexdigest()
 
 
 def verify_api_key(full_key: str, hashed: str, settings: Settings | None = None) -> bool:
@@ -78,5 +78,7 @@ def verify_api_key(full_key: str, hashed: str, settings: Settings | None = None)
 
 
 # --------------------------------------------------------------------------- RBAC
-def role_allows(actual: Role, required: Role) -> bool:
+def role_allows(actual: Role | str, required: Role | str) -> bool:
+    actual = actual if isinstance(actual, Role) else Role(actual)
+    required = required if isinstance(required, Role) else Role(required)
     return _ROLE_RANK[actual] >= _ROLE_RANK[required]

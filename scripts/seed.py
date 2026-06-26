@@ -19,14 +19,26 @@ configure_logging(service_name="seed", json_logs=False)
 log = get_logger(__name__)
 
 SAMPLE_DOCS = [
-    ("Kubernetes HPA", "Horizontal Pod Autoscaling scales the number of pod replicas based on "
-     "observed CPU utilization or custom metrics exposed via the metrics API."),
-    ("Circuit breaker", "A circuit breaker prevents cascading failures by failing fast once a "
-     "downstream dependency crosses an error threshold, then probing for recovery."),
-    ("Vector search", "pgvector stores embeddings in Postgres and supports approximate nearest "
-     "neighbour search using HNSW indexes with cosine distance for semantic retrieval."),
-    ("GitOps", "ArgoCD continuously reconciles the cluster state against manifests stored in a "
-     "git repository, enabling declarative deployments, rollbacks, and environment promotion."),
+    (
+        "Kubernetes HPA",
+        "Horizontal Pod Autoscaling scales the number of pod replicas based on "
+        "observed CPU utilization or custom metrics exposed via the metrics API.",
+    ),
+    (
+        "Circuit breaker",
+        "A circuit breaker prevents cascading failures by failing fast once a "
+        "downstream dependency crosses an error threshold, then probing for recovery.",
+    ),
+    (
+        "Vector search",
+        "pgvector stores embeddings in Postgres and supports approximate nearest "
+        "neighbour search using HNSW indexes with cosine distance for semantic retrieval.",
+    ),
+    (
+        "GitOps",
+        "ArgoCD continuously reconciles the cluster state against manifests stored in a "
+        "git repository, enabling declarative deployments, rollbacks, and environment promotion.",
+    ),
 ]
 
 

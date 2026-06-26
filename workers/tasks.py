@@ -74,9 +74,7 @@ async def _sync_connector_async(job_id: uuid.UUID, connector_id: uuid.UUID) -> d
             total = 0
             async for result in connector.fetch():
                 for rec in result.records:
-                    await upsert_document(
-                        db, tenant_id=cc.tenant_id, job_id=job_id, record=rec
-                    )
+                    await upsert_document(db, tenant_id=cc.tenant_id, job_id=job_id, record=rec)
                     total += 1
                 cc.cursor = result.next_cursor  # persist incremental progress
                 await db.flush()
@@ -155,10 +153,10 @@ async def _scan_active_connectors_async() -> dict[str, int]:
     enqueued = 0
     async with session_scope() as db:
         connectors = (
-            await db.execute(
-                select(ConnectorConfig).where(ConnectorConfig.is_active.is_(True))
-            )
-        ).scalars().all()
+            (await db.execute(select(ConnectorConfig).where(ConnectorConfig.is_active.is_(True))))
+            .scalars()
+            .all()
+        )
         for cc in connectors:
             key = f"scheduled:{cc.id}:{datetime.now(UTC):%Y%m%d%H%M}"
             job = IngestionJob(

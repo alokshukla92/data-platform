@@ -41,9 +41,7 @@ def init_engine(settings: Settings | None = None) -> AsyncEngine:
             pool_recycle=1800,
             echo=False,
         )
-        _sessionmaker = async_sessionmaker(
-            _engine, expire_on_commit=False, class_=AsyncSession
-        )
+        _sessionmaker = async_sessionmaker(_engine, expire_on_commit=False, class_=AsyncSession)
     return _engine
 
 

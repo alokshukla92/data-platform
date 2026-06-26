@@ -9,8 +9,16 @@ on-box (zero API cost, reproducible); ``OpenAIEmbeddingProvider`` is a drop-in s
 from __future__ import annotations
 
 import hashlib
+import os
 from abc import ABC, abstractmethod
 from functools import lru_cache
+
+# PyTorch/OpenMP are not fork-safe and deadlock with multiple threads inside
+# containerized / prefork workers. Pin to single-threaded BLAS/OMP *before* torch is
+# imported anywhere in the process. CPU parallelism for batches is handled by us.
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
 from .config import EmbeddingProvider as ProviderEnum
 from .config import Settings, get_settings
@@ -40,8 +48,10 @@ class LocalEmbeddingProvider(EmbeddingProvider):
 
     def _load(self):
         if self._model is None:
+            import torch
             from sentence_transformers import SentenceTransformer
 
+            torch.set_num_threads(1)  # defensive: avoid OpenMP fork deadlocks
             log.info("loading_embedding_model", model=self.model_name)
             self._model = SentenceTransformer(self.model_name)
         return self._model

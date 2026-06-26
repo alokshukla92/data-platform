@@ -75,9 +75,7 @@ class AsyncCircuitBreaker:
 
     def _transition(self, new: BreakerState) -> None:
         if new != self._state:
-            log.warning(
-                "circuit_breaker_state_change", breaker=self.name, old=self._state, new=new
-            )
+            log.warning("circuit_breaker_state_change", breaker=self.name, old=self._state, new=new)
             self._state = new
             self._publish()
 
@@ -124,9 +122,7 @@ def get_breaker(
     name: str, *, fail_max: int = 5, reset_timeout: float = 30.0
 ) -> AsyncCircuitBreaker:
     if name not in _breakers:
-        _breakers[name] = AsyncCircuitBreaker(
-            name, fail_max=fail_max, reset_timeout=reset_timeout
-        )
+        _breakers[name] = AsyncCircuitBreaker(name, fail_max=fail_max, reset_timeout=reset_timeout)
     return _breakers[name]
 
 

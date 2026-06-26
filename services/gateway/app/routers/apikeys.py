@@ -32,9 +32,7 @@ async def create_key(
     )
     db.add(key)
     await db.flush()
-    return ApiKeyCreated(
-        id=key.id, name=key.name, api_key=full_key, prefix=prefix, role=key.role
-    )
+    return ApiKeyCreated(id=key.id, name=key.name, api_key=full_key, prefix=prefix, role=key.role)
 
 
 @router.delete("/{key_id}", status_code=204)
