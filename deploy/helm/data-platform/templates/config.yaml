@@ -4,6 +4,12 @@ metadata:
   name: {{ .Release.Name }}-config
   labels:
     app.kubernetes.io/part-of: data-platform
+  annotations:
+    # Created in PreSync (weight -10) so the migrate hook (weight -5) and the app
+    # Deployments can consume it via envFrom. Persisted across syncs.
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation
 data:
 {{- range $k, $v := .Values.config }}
   {{ $k }}: {{ $v | quote }}
@@ -16,6 +22,11 @@ metadata:
   name: {{ .Release.Name }}-secrets
   labels:
     app.kubernetes.io/part-of: data-platform
+  annotations:
+    # PreSync (weight -10): must exist before the migrate hook and app pods start.
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation
 type: Opaque
 stringData:
 {{- range $k, $v := .Values.secrets.data }}
