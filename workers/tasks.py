@@ -82,6 +82,8 @@ def sync_connector(self, job_id: str, connector_id: str) -> dict[str, Any]:
 
 async def _sync_connector_async(job_id: uuid.UUID, connector_id: uuid.UUID) -> dict[str, Any]:
     with JOB_PROCESSING_SECONDS.labels(job_type="sync_connector").time():
+        # 1) Mark RUNNING in its own transaction so the UI/log reflects progress
+        #    immediately instead of staying "pending" until the whole sync commits.
         async with session_scope() as db:
             cc = (
                 await db.execute(select(ConnectorConfig).where(ConnectorConfig.id == connector_id))
@@ -93,24 +95,46 @@ async def _sync_connector_async(job_id: uuid.UUID, connector_id: uuid.UUID) -> d
             job.started_at = datetime.now(UTC)
             job.attempts += 1
             await record_event(db, job_id, JobStatus.RUNNING, "sync started")
-
-            connector_cls = get_connector_class(cc.connector_type)
+            connector_type = cc.connector_type
+            tenant_id = cc.tenant_id
             ctx = ConnectorContext(tenant_id=str(cc.tenant_id), config=cc.config, cursor=cc.cursor)
-            connector = connector_cls(ctx)
 
-            total = 0
+        # 2) Stream batches; commit each batch separately so progress is durable and
+        #    visible live, and a crash mid-sync resumes from the persisted cursor.
+        connector = get_connector_class(connector_type)(ctx)
+        total = 0
+        batch_no = 0
+        try:
             async for result in connector.fetch():
-                for rec in result.records:
-                    await upsert_document(db, tenant_id=cc.tenant_id, job_id=job_id, record=rec)
-                    total += 1
-                cc.cursor = result.next_cursor  # persist incremental progress
-                await db.flush()
+                async with session_scope() as db:
+                    for rec in result.records:
+                        await upsert_document(db, tenant_id=tenant_id, job_id=job_id, record=rec)
+                        total += 1
+                    cc = (
+                        await db.execute(
+                            select(ConnectorConfig).where(ConnectorConfig.id == connector_id)
+                        )
+                    ).scalar_one()
+                    cc.cursor = result.next_cursor  # persist incremental progress
+                    batch_no += 1
+                    await record_event(
+                        db,
+                        job_id,
+                        JobStatus.RUNNING,
+                        f"ingested batch {batch_no} ({total} records so far)",
+                    )
+        finally:
             await connector.close()
 
+        # 3) Mark SUCCEEDED.
+        async with session_scope() as db:
+            job = (
+                await db.execute(select(IngestionJob).where(IngestionJob.id == job_id))
+            ).scalar_one()
             job.status = JobStatus.SUCCEEDED
             job.finished_at = datetime.now(UTC)
             await record_event(db, job_id, JobStatus.SUCCEEDED, f"ingested {total} records")
-    INGEST_JOBS_TOTAL.labels(connector_type=cc.connector_type, status="succeeded").inc()
+    INGEST_JOBS_TOTAL.labels(connector_type=connector_type, status="succeeded").inc()
     return {"status": "succeeded", "records": total}
 
 
