@@ -47,6 +47,22 @@ export interface UploadResponse {
   idempotency_key: string;
 }
 
+export type ConnectorType = "rest" | "csv" | "pdf" | "postgres" | "s3";
+
+export interface Connector {
+  id: string;
+  name: string;
+  connector_type: ConnectorType;
+  is_active: boolean;
+  cursor: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface ConnectorValidation {
+  ok: boolean;
+  detail: string | null;
+}
+
 export type SearchMode = "semantic" | "keyword" | "hybrid";
 
 export interface SearchHit {

@@ -1,5 +1,8 @@
 import { API } from "./config";
 import type {
+  Connector,
+  ConnectorType,
+  ConnectorValidation,
   Job,
   Page,
   Principal,
@@ -112,6 +115,27 @@ export const api = {
   },
   getJob(id: string) {
     return request<Job>(API.ingestion, `/api/v1/jobs/${id}`);
+  },
+
+  // ---- connectors (gateway) ----
+  listConnectors() {
+    return request<Page<Connector>>(API.gateway, "/api/v1/connectors?limit=100");
+  },
+  createConnector(name: string, connectorType: ConnectorType, config: Record<string, unknown>) {
+    return request<Connector>(API.gateway, "/api/v1/connectors", {
+      method: "POST",
+      body: { name, connector_type: connectorType, config },
+    });
+  },
+  validateConnector(id: string) {
+    return request<ConnectorValidation>(API.gateway, `/api/v1/connectors/${id}/validate`, {
+      method: "POST",
+    });
+  },
+  syncConnector(id: string) {
+    return request<UploadResponse>(API.gateway, `/api/v1/connectors/${id}/sync`, {
+      method: "POST",
+    });
   },
 
   // ---- retrieval ----

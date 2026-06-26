@@ -4,6 +4,7 @@ import Layout from "./components/Layout";
 import LoginPage from "./pages/LoginPage";
 import SearchPage from "./pages/SearchPage";
 import UploadPage from "./pages/UploadPage";
+import ConnectorsPage from "./pages/ConnectorsPage";
 import JobsPage from "./pages/JobsPage";
 import { Spinner } from "./components/ui";
 
@@ -25,6 +26,7 @@ export default function App() {
       <Route element={<Layout />}>
         <Route path="/search" element={<SearchPage />} />
         <Route path="/upload" element={<UploadPage />} />
+        <Route path="/connectors" element={<ConnectorsPage />} />
         <Route path="/jobs" element={<JobsPage />} />
         <Route path="*" element={<Navigate to="/search" replace />} />
       </Route>

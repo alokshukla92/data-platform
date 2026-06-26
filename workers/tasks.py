@@ -10,6 +10,7 @@ Reliability model:
 from __future__ import annotations
 
 import asyncio
+import threading
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -33,9 +34,35 @@ from .celery_app import celery_app
 log = get_task_logger(__name__)
 
 
+_async_loop: asyncio.AbstractEventLoop | None = None
+_async_loop_lock = threading.Lock()
+
+
+def _get_async_loop() -> asyncio.AbstractEventLoop:
+    """A single, long-lived event loop shared by all worker threads.
+
+    Celery's threads pool runs tasks on different OS threads. Using ``asyncio.run``
+    per task would spin up a fresh loop each time, but our async SQLAlchemy engine +
+    asyncpg pool are bound to the loop that created them; reusing that engine from a
+    different loop raises "Future attached to a different loop". Funnelling every
+    coroutine onto one dedicated background loop keeps the engine/pool valid and
+    serialises DB access safely.
+    """
+    global _async_loop
+    if _async_loop is None or _async_loop.is_closed():
+        with _async_loop_lock:
+            if _async_loop is None or _async_loop.is_closed():
+                loop = asyncio.new_event_loop()
+                threading.Thread(
+                    target=loop.run_forever, name="worker-async-loop", daemon=True
+                ).start()
+                _async_loop = loop
+    return _async_loop
+
+
 def _run(coro):
-    """Bridge Celery's sync worker to our async data layer."""
-    return asyncio.run(coro)
+    """Bridge Celery's sync worker to our async data layer (one shared loop)."""
+    return asyncio.run_coroutine_threadsafe(coro, _get_async_loop()).result()
 
 
 # --------------------------------------------------------------------------- connector sync

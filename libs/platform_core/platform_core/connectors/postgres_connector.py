@@ -42,14 +42,22 @@ class PostgresConnector(BaseConnector):
         cfg = self.ctx.config
         cursor_field = cfg["cursor_field"]
         table = cfg["table"]
+        # Build the keyset predicate only when we have a cursor. Binding NULL into
+        # ``:last IS NULL OR col > :last`` makes asyncpg unable to infer the parameter
+        # type (AmbiguousParameterError), so the first (full) sync omits it entirely.
+        params: dict[str, Any] = {"lim": batch_size}
+        where = ""
+        if last_value is not None:
+            where = f"WHERE {cursor_field} > :last "
+            params["last"] = last_value
         try:
             async with engine.connect() as conn:
                 stmt = text(
                     f"SELECT * FROM {table} "  # noqa: S608 - table from trusted tenant config
-                    f"WHERE :last IS NULL OR {cursor_field} > :last "
+                    f"{where}"
                     f"ORDER BY {cursor_field} ASC LIMIT :lim"
                 )
-                result = await conn.execute(stmt, {"last": last_value, "lim": batch_size})
+                result = await conn.execute(stmt, params)
                 return [dict(r._mapping) for r in result]
         except ConnectionError as exc:
             raise TransientError(str(exc)) from exc
